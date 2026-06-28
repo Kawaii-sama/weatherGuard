@@ -10,6 +10,15 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { AppConfig } from '../../config/configuration';
 
+// Google/GitHub strategies only get registered when their credentials are
+// actually set — otherwise the underlying OAuth library throws and crashes
+// the whole app on boot. This lets the server start (and everything except
+// OAuth login work) even before those keys are filled in.
+const optionalAuthProviders = [
+  ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? [GoogleStrategy] : []),
+  ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET ? [GithubStrategy] : []),
+];
+
 @Module({
   imports: [
     UsersModule,
@@ -24,6 +33,6 @@ import { AppConfig } from '../../config/configuration';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, GoogleStrategy, GithubStrategy, JwtStrategy],
+  providers: [AuthService, JwtStrategy, ...optionalAuthProviders],
 })
 export class AuthModule {}
