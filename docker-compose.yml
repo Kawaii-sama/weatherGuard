@@ -1,0 +1,49 @@
+version: '3.8'
+
+# One-command local stack. Copy api/.env.example -> api/.env and fill in
+# your OAuth + Telegram credentials first — MONGODB_URI and REDIS_URL below
+# are intentionally overridden to point at the other containers instead of
+# localhost, since the API runs inside this network rather than on the host.
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  api:
+    build:
+      context: ./api
+    restart: unless-stopped
+    env_file:
+      - ./api/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/weatherguard
+      REDIS_URL: redis://redis:6379
+    ports:
+      - '3000:3000'
+    depends_on:
+      - mongo
+      - redis
+
+  admin:
+    build:
+      context: ./admin
+      args:
+        VITE_API_URL: http://localhost:3000
+    restart: unless-stopped
+    ports:
+      - '5173:80'
+    depends_on:
+      - api
+
+volumes:
+  mongo-data:

@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cloud text-ink font-body;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+
+  /* Visible keyboard focus everywhere — kawaii doesn't mean inaccessible. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-none ring-2 ring-offset-2 ring-offset-cloud ring-[#8E7CC3];
+  }
+}
+
+@layer components {
+  .kawaii-card {
+    @apply bg-white rounded-blob shadow-[0_8px_30px_rgba(74,64,99,0.08)] border border-[#F1E4F0];
+  }
+
+  .kawaii-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-ink text-white font-display font-semibold px-6 py-3 transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0;
+  }
+
+  .kawaii-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-white text-ink font-display font-semibold px-6 py-3 border-2 border-[#F1E4F0] transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0;
+  }
+
+  .kawaii-btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-blush text-ink font-display font-semibold px-5 py-2.5 text-sm transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0;
+  }
+
+  .kawaii-btn-success {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-mint text-ink font-display font-semibold px-5 py-2.5 text-sm transition-transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0;
+  }
+
+  .kawaii-input {
+    @apply w-full rounded-2xl border-2 border-[#F1E4F0] bg-white px-4 py-3 text-ink placeholder:text-ink-soft/60 font-body;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

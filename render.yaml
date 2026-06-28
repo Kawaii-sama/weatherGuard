@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: weatherguard-api
+    runtime: node
+    rootDir: api
+    buildCommand: npm install && npm run build
+    startCommand: node dist/main.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # MongoDB Atlas connection string (Render has no managed MongoDB —
+      # create a free cluster at mongodb.com/atlas and paste the URI here).
+      - key: MONGODB_URI
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          name: weatherguard-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: API_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CALLBACK_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: ALERT_BROADCAST_CRON
+        value: "0 * * * *"
+
+  - type: redis
+    name: weatherguard-redis
+    plan: free
+    ipAllowList: []
