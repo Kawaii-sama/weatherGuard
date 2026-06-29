@@ -1,5 +1,3 @@
-version: '3.8'
-
 # One-command local stack. Copy api/.env.example -> api/.env and fill in
 # your OAuth + Telegram credentials first — MONGODB_URI and REDIS_URL below
 # are intentionally overridden to point at the other containers instead of
