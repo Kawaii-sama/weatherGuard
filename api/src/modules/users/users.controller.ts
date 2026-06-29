@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Query } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -18,14 +18,12 @@ export class UsersController {
     private readonly configService: ConfigService<AppConfig, true>,
   ) {}
 
-  /** The logged-in user's own profile — drives the "pending / approved" UI state. */
   @Get('me')
   async getMe(@CurrentUser() currentUser: AuthenticatedUser): Promise<UserResponseDto> {
     const user = await this.usersService.findById(currentUser.userId);
     return this.toResponseDto(user, { includeOwnDeepLink: true });
   }
 
-  /** Lets a pending (or approved) user set the city they want alerts for, plus a request note. */
   @Patch('me')
   async updateMe(
     @CurrentUser() currentUser: AuthenticatedUser,
@@ -35,7 +33,6 @@ export class UsersController {
     return this.toResponseDto(user, { includeOwnDeepLink: true });
   }
 
-  /** Admin-only: list users, optionally filtered by status (?status=pending). */
   @Get()
   @Roles(UserRole.ADMIN)
   async list(@Query('status') status?: UserStatus): Promise<UserResponseDto[]> {
@@ -43,7 +40,6 @@ export class UsersController {
     return users.map((user) => this.toResponseDto(user));
   }
 
-  /** Admin-only: approve a pending user. This is what unlocks alert delivery. */
   @Patch(':id/approve')
   @Roles(UserRole.ADMIN)
   async approve(
@@ -54,7 +50,6 @@ export class UsersController {
     return this.toResponseDto(user);
   }
 
-  /** Admin-only: reject a pending user. */
   @Patch(':id/reject')
   @Roles(UserRole.ADMIN)
   async reject(
@@ -63,6 +58,14 @@ export class UsersController {
   ): Promise<UserResponseDto> {
     const user = await this.usersService.reject(id, admin.userId);
     return this.toResponseDto(user);
+  }
+
+  /** Admin-only: permanently delete a user and all their alert logs. */
+  @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async hardDelete(@Param('id') id: string): Promise<void> {
+    await this.usersService.hardDelete(id);
   }
 
   private toResponseDto(

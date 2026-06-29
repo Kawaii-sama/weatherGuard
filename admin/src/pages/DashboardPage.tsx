@@ -17,6 +17,7 @@ export function DashboardPage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [actingOn, setActingOn] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<AppUser | null>(null);
 
   const load = useCallback(async (status: UserStatus) => {
     setError(null);
@@ -34,9 +35,7 @@ export function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => {
-    load(tab);
-  }, [tab, load]);
+  useEffect(() => { load(tab); }, [tab, load]);
 
   const handleApprove = async (id: string) => {
     setActingOn(id);
@@ -57,6 +56,20 @@ export function DashboardPage() {
       await load(tab);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not reject this user.');
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!confirmDelete) return;
+    setActingOn(confirmDelete.id);
+    setConfirmDelete(null);
+    try {
+      await api.deleteUser(confirmDelete.id);
+      await load(tab);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : 'Could not delete this user.');
     } finally {
       setActingOn(null);
     }
@@ -88,6 +101,37 @@ export function DashboardPage() {
         </div>
       )}
 
+      {/* ── Confirm delete modal ── */}
+      {confirmDelete && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+        }}>
+          <div className="kawaii-card px-8 py-8 max-w-sm w-full text-center">
+            <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🗑️</div>
+            <h2 className="font-display font-extrabold text-lg mb-2">Delete {confirmDelete.name}?</h2>
+            <p className="text-ink-soft text-sm mb-6">
+              This will permanently delete their account, all alert logs, and their entire history.
+              <strong> This cannot be undone.</strong>
+            </p>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 kawaii-btn-secondary"
+                onClick={() => setConfirmDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 kawaii-btn-danger"
+                onClick={handleDeleteConfirmed}
+              >
+                Yes, delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="kawaii-card overflow-hidden">
         {users === null ? (
           <div className="px-8 py-10">
@@ -108,7 +152,7 @@ export function DashboardPage() {
                 <th className="px-5 py-3">City</th>
                 <th className="px-5 py-3">Telegram</th>
                 <th className="px-5 py-3">Status</th>
-                {tab === 'pending' && <th className="px-5 py-3 text-right">Actions</th>}
+                <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1E4F0]">
@@ -121,24 +165,42 @@ export function DashboardPage() {
                   <td className="px-5 py-4">
                     <StatusBadge status={u.status} />
                   </td>
-                  {tab === 'pending' && (
-                    <td className="px-5 py-4 text-right space-x-2">
-                      <button
-                        className="kawaii-btn-success"
-                        disabled={actingOn === u.id}
-                        onClick={() => handleApprove(u.id)}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        className="kawaii-btn-danger"
-                        disabled={actingOn === u.id}
-                        onClick={() => handleReject(u.id)}
-                      >
-                        Reject
-                      </button>
-                    </td>
-                  )}
+                  <td className="px-5 py-4 text-right space-x-2">
+                    {tab === 'pending' && (
+                      <>
+                        <button
+                          className="kawaii-btn-success"
+                          disabled={actingOn === u.id}
+                          onClick={() => handleApprove(u.id)}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="kawaii-btn-danger"
+                          disabled={actingOn === u.id}
+                          onClick={() => handleReject(u.id)}
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                    <button
+                      disabled={actingOn === u.id}
+                      onClick={() => setConfirmDelete(u)}
+                      style={{
+                        background: 'none',
+                        border: '1.5px solid #e0c0c0',
+                        borderRadius: '8px',
+                        padding: '5px 12px',
+                        fontSize: '0.8rem',
+                        color: '#9B3B3B',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      🗑️ Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
