@@ -1,6 +1,10 @@
 export interface WeatherData {
   city: string;
   temperatureCelsius: number;
+  feelsLikeCelsius: number;
+  humidity: number;
+  windSpeedKph: number;
+  visibilityKm: number;
   condition: string;
   emoji: string;
   summary: string;
