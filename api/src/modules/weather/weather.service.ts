@@ -13,14 +13,6 @@ const CONDITIONS: Array<{ condition: string; emoji: string }> = [
   { condition: 'Windy', emoji: '🌬️' },
 ];
 
-/**
- * Talks to OpenWeatherMap when an API key is configured. Without one, it
- * falls back to a deterministic simulator (seeded by city name + current
- * hour) so the rest of the pipeline — scheduling, Telegram delivery,
- * logging — is fully demoable without any third-party weather account.
- * This is also exactly what the "simulated weather alert" deliverable
- * exercises on demand via POST /alerts/simulate/:userId.
- */
 @Injectable()
 export class WeatherService {
   private readonly logger = new Logger(WeatherService.name);
@@ -44,22 +36,25 @@ export class WeatherService {
   }
 
   private async fetchFromOpenWeather(city: string, apiKey: string): Promise<WeatherData> {
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(
-      city,
-    )}&units=metric&appid=${apiKey}`;
-
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&units=metric&appid=${apiKey}`;
     const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`OpenWeather responded with ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`OpenWeather responded with ${response.status}`);
 
     const data: any = await response.json();
     const condition: string = data.weather?.[0]?.main ?? 'Unknown';
     const temperatureCelsius: number = Math.round(data.main?.temp ?? 0);
+    const feelsLikeCelsius: number = Math.round(data.main?.feels_like ?? temperatureCelsius);
+    const humidity: number = data.main?.humidity ?? 0;
+    const windSpeedKph: number = Math.round((data.wind?.speed ?? 0) * 3.6); // m/s to km/h
+    const visibilityKm: number = Math.round((data.visibility ?? 10000) / 1000);
 
     return {
       city,
       temperatureCelsius,
+      feelsLikeCelsius,
+      humidity,
+      windSpeedKph,
+      visibilityKm,
       condition,
       emoji: this.emojiFor(condition),
       summary: data.weather?.[0]?.description ?? condition,
@@ -67,15 +62,22 @@ export class WeatherService {
     };
   }
 
-  /** Deterministic per city + hour, so repeated demos within the same hour look consistent. */
   simulate(city: string): WeatherData {
     const seed = this.hashString(`${city.toLowerCase()}-${new Date().getHours()}`);
     const { condition, emoji } = CONDITIONS[seed % CONDITIONS.length];
-    const temperatureCelsius = 5 + (seed % 30); // a plausible-looking 5–34°C
+    const temperatureCelsius = 5 + (seed % 30);
+    const feelsLikeCelsius = temperatureCelsius - (seed % 5);
+    const humidity = 40 + (seed % 50);
+    const windSpeedKph = 5 + (seed % 30);
+    const visibilityKm = 5 + (seed % 10);
 
     return {
       city,
       temperatureCelsius,
+      feelsLikeCelsius,
+      humidity,
+      windSpeedKph,
+      visibilityKm,
       condition,
       emoji,
       summary: `${condition.toLowerCase()} with a gentle breeze`,
@@ -84,7 +86,9 @@ export class WeatherService {
   }
 
   private emojiFor(condition: string): string {
-    const match = CONDITIONS.find((entry) => entry.condition.toLowerCase().includes(condition.toLowerCase()));
+    const match = CONDITIONS.find((entry) =>
+      entry.condition.toLowerCase().includes(condition.toLowerCase()),
+    );
     return match?.emoji ?? '🌈';
   }
 
