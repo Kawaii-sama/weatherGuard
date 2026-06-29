@@ -14,149 +14,100 @@ export function TelegramConnect({ deepLink }: TelegramConnectProps) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '8px' }}>
 
-      {/* ── Desktop section ── */}
+      {/* ── Desktop card ── */}
       <div style={{
-        borderRadius: '20px',
-        padding: '18px 16px',
-        background: 'linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%)',
-        border: '2px solid #f48fb1',
+        borderRadius: '22px',
+        padding: '20px 18px',
+        background: '#fff0f5',
+        border: '1.5px solid #f9c6d8',
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* decorative vine */}
-        <span style={{ position: 'absolute', top: 6, right: 10, fontSize: '1.4rem', opacity: 0.5 }}>🌸</span>
-        <span style={{ position: 'absolute', bottom: 6, right: 28, fontSize: '1rem', opacity: 0.4 }}>🌿</span>
+        {/* soft bg decoration */}
+        <span style={{ position: 'absolute', top: -6, right: -4, fontSize: '3.5rem', opacity: 0.08, userSelect: 'none' }}>🌸</span>
+        <span style={{ position: 'absolute', bottom: -8, left: -4, fontSize: '3rem', opacity: 0.07, userSelect: 'none' }}>🌷</span>
 
-        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#880e4f', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <p style={{ fontWeight: 800, fontSize: '0.82rem', color: '#c2678a', marginBottom: '4px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           🖥️ On Desktop
-        </div>
-        <p style={{ fontSize: '0.78rem', color: '#ad1457', marginBottom: '12px', lineHeight: 1.5 }}>
-          Click below to open the bot. No Telegram installed? Use the Web version — works right in your browser!
         </p>
+        <p style={{ fontSize: '0.78rem', color: '#b07090', marginBottom: '14px', lineHeight: 1.6, margin: '4px 0 14px' }}>
+          Click below to open the bot. Don't have Telegram installed? No worries — the Web version works straight in your browser.
+        </p>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <a
-            href={deepLink}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              padding: '11px',
-              borderRadius: '14px',
-              background: '#e91e8c',
-              color: '#fff',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              textDecoration: 'none',
-              boxShadow: '0 3px 10px rgba(233,30,140,0.25)',
-            }}
-          >
+          <a href={deepLink} target="_blank" rel="noreferrer" style={{
+            display: 'block', textAlign: 'center', padding: '11px 16px',
+            borderRadius: '14px', background: '#f4a7c0', color: '#fff',
+            fontWeight: 700, fontSize: '0.875rem', textDecoration: 'none',
+            boxShadow: '0 2px 8px rgba(244,167,192,0.4)',
+            letterSpacing: '0.01em',
+          }}>
             🌸 Open in Telegram App
           </a>
-          <a
-            href="https://web.telegram.org/k/"
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              padding: '11px',
-              borderRadius: '14px',
-              background: '#fff',
-              color: '#ad1457',
-              fontWeight: 700,
-              fontSize: '0.875rem',
-              textDecoration: 'none',
-              border: '2px solid #f48fb1',
-            }}
-          >
+          <a href="https://web.telegram.org/k/" target="_blank" rel="noreferrer" style={{
+            display: 'block', textAlign: 'center', padding: '11px 16px',
+            borderRadius: '14px', background: '#fff', color: '#c2678a',
+            fontWeight: 700, fontSize: '0.875rem', textDecoration: 'none',
+            border: '1.5px solid #f9c6d8',
+          }}>
             🌐 Open in Telegram Web (no install)
           </a>
         </div>
       </div>
 
-      {/* ── Mobile section ── */}
+      {/* ── Mobile card ── */}
       <div style={{
-        borderRadius: '20px',
-        padding: '18px 16px',
-        background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
-        border: '2px solid #a5d6a7',
+        borderRadius: '22px',
+        padding: '20px 18px',
+        background: '#f2faf4',
+        border: '1.5px solid #b8dfc2',
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* decorative plants */}
-        <span style={{ position: 'absolute', top: 6, right: 10, fontSize: '1.4rem', opacity: 0.5 }}>🌱</span>
-        <span style={{ position: 'absolute', bottom: 6, right: 30, fontSize: '1rem', opacity: 0.4 }}>🍃</span>
-        <span style={{ position: 'absolute', top: 6, left: 10, fontSize: '1rem', opacity: 0.3 }}>🌿</span>
+        {/* soft bg decoration */}
+        <span style={{ position: 'absolute', top: -6, right: -4, fontSize: '3.5rem', opacity: 0.08, userSelect: 'none' }}>🌿</span>
+        <span style={{ position: 'absolute', bottom: -8, left: -4, fontSize: '3rem', opacity: 0.07, userSelect: 'none' }}>🍃</span>
+        <span style={{ position: 'absolute', top: '40%', right: -6, fontSize: '2.5rem', opacity: 0.06, userSelect: 'none' }}>🌱</span>
 
-        <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1b5e20', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <p style={{ fontWeight: 800, fontSize: '0.82rem', color: '#4a9265', marginBottom: '4px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           📱 On Mobile
-        </div>
-        <p style={{ fontSize: '0.78rem', color: '#2e7d32', marginBottom: '12px', lineHeight: 1.5 }}>
-          Copy this link and send it to yourself on WhatsApp or iMessage, then tap it on your phone!
+        </p>
+        <p style={{ fontSize: '0.78rem', color: '#5a8a6a', marginBottom: '14px', lineHeight: 1.6, margin: '4px 0 14px' }}>
+          Copy this link and send it to yourself on WhatsApp or iMessage, then tap it on your phone to open the bot.
         </p>
 
-        {/* Copyable link box */}
+        {/* link copy box */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          background: '#fff',
-          borderRadius: '12px',
-          padding: '8px 12px',
-          border: '2px solid #a5d6a7',
-          marginBottom: '8px',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          background: '#fff', borderRadius: '12px',
+          padding: '8px 12px', border: '1.5px solid #b8dfc2', marginBottom: '8px',
         }}>
           <span style={{
-            flex: 1,
-            fontSize: '0.7rem',
-            fontFamily: 'monospace',
-            color: '#374151',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            flex: 1, fontSize: '0.7rem', fontFamily: 'monospace',
+            color: '#4a6055', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {deepLink}
           </span>
-          <button
-            onClick={handleCopy}
-            style={{
-              flexShrink: 0,
-              background: copied ? '#43a047' : '#2e7d32',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '6px 14px',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'background 0.2s',
-            }}
-          >
-            {copied ? '✓ Copied!' : 'Copy 🌿'}
+          <button onClick={handleCopy} style={{
+            flexShrink: 0,
+            background: copied ? '#7ec89a' : '#a8d8b8',
+            color: copied ? '#fff' : '#2d6a4f',
+            border: 'none', borderRadius: '10px',
+            padding: '6px 14px', fontSize: '0.8rem', fontWeight: 700,
+            cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s',
+          }}>
+            {copied ? '✓ Copied!' : 'Copy'}
           </button>
         </div>
 
-        <a
-          href={deepLink}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            display: 'block',
-            textAlign: 'center',
-            padding: '11px',
-            borderRadius: '14px',
-            background: '#43a047',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            textDecoration: 'none',
-            boxShadow: '0 3px 10px rgba(67,160,71,0.25)',
-          }}
-        >
+        <a href={deepLink} target="_blank" rel="noreferrer" style={{
+          display: 'block', textAlign: 'center', padding: '11px 16px',
+          borderRadius: '14px', background: '#a8d8b8', color: '#2d6a4f',
+          fontWeight: 700, fontSize: '0.875rem', textDecoration: 'none',
+          boxShadow: '0 2px 8px rgba(168,216,184,0.5)',
+        }}>
           🌱 Or tap here to open directly
         </a>
       </div>
