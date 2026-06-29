@@ -5,6 +5,7 @@ import { Telegraf } from 'telegraf';
 import { UsersService } from '../users/users.service';
 import { UserApprovedEvent } from '../users/events/user-lifecycle.events';
 import { AppConfig } from '../../config/configuration';
+import { UserStatus } from '../../common/enums';
 
 /**
  * Owns the single Telegraf bot instance for the whole app. Two
@@ -43,11 +44,26 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     this.bot = new Telegraf(token);
     this.registerHandlers(this.bot);
 
-    // Long polling. Fine for a single Render/Railway/Fly instance; swap for
-    // bot.telegram.setWebhook(...) behind an Express route if you ever need
-    // to run this on a serverless platform — see README "Production notes".
-    await this.bot.launch();
-    this.logger.log('Telegram bot is live and polling for updates.');
+    // Fire-and-forget with backoff: a Telegram outage (rate limiting, an
+    // ISP-level block, a brief API incident, etc.) must never block the
+    // rest of the API — auth, users, alerts — from starting up.
+    this.launchWithRetry();
+  }
+
+  private launchWithRetry(attempt = 1): void {
+    if (!this.bot) return;
+
+    this.bot
+      .launch()
+      .then(() => this.logger.log('Telegram bot is live and polling for updates.'))
+      .catch((error) => {
+        const delaySeconds = Math.min(60, 5 * attempt);
+        this.logger.warn(
+          `Telegram bot launch failed (attempt ${attempt}): ${(error as Error).message}. ` +
+            `Retrying in ${delaySeconds}s — the rest of the API is unaffected.`,
+        );
+        setTimeout(() => this.launchWithRetry(attempt + 1), delaySeconds * 1000);
+      });
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -57,7 +73,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private registerHandlers(bot: Telegraf): void {
     bot.start(async (ctx) => {
       const token = ctx.startPayload; // the part after ?start= in the deep link
-      const chatId = ctx.chat.id.toString();
+      const chatId = ctx.chat?.id?.toString();
+
+      if (!chatId) {
+        return;
+      }
 
       if (!token) {
         await ctx.reply(
@@ -75,7 +95,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
       await this.usersService.linkTelegramAccount(user._id.toString(), chatId);
 
-      if (user.status === 'approved') {
+      if (user.status === UserStatus.APPROVED) {
         await ctx.reply(
           `🎉☁️ Yay, ${user.name}! Your Telegram is linked and you're already approved.\n\n` +
             `I'll send your kawaii weather alerts for *${user.city}* right here. ☀️🌧️`,
