@@ -15,24 +15,8 @@ import { UserDocument } from '../users/schemas/user.schema';
 export const ALERTS_QUEUE = 'weather-alerts';
 export const BROADCAST_JOB = 'broadcast';
 export const RECURRING_BROADCAST_JOB_ID = 'recurring-weather-broadcast';
+export const RECURRING_BROADCAST_JOB_ID_2 = 'recurring-weather-broadcast-evening';
 
-/**
- * Owns the entire alert-delivery pipeline:
- *   1. Schedules a recurring BullMQ job (cron pattern from ALERT_BROADCAST_CRON)
- *      that fans out a weather alert to every APPROVED + Telegram-linked user.
- *      This is the "automated weather alerts" deliverable.
- *   2. Exposes `simulateForUser`, the synchronous path the admin dashboard's
- *      "Send test alert" button calls — this is the "simulated weather
- *      alert" deliverable, and intentionally bypasses the queue (an admin
- *      explicitly testing one user doesn't need to wait for a worker tick).
- *
- * Both paths funnel through the same private `deliverAlertToUser`, which is
- * the *only* place that actually calls TelegramService.sendMessage — this is
- * the single choke point that guarantees nothing ever gets sent to a user
- * who isn't APPROVED and telegramLinked (see the guard at the top of that
- * method). AlertsProcessor (the BullMQ worker) is the only other caller, and
- * it only reaches users already filtered by `findApprovedAndLinked()`.
- */
 @Injectable()
 export class AlertsService implements OnModuleInit {
   private readonly logger = new Logger(AlertsService.name);
@@ -47,28 +31,38 @@ export class AlertsService implements OnModuleInit {
   ) {}
 
   /**
-   * Registers the recurring broadcast as a BullMQ repeatable job. Removing
-   * any existing repeatable job with the same key first makes this
-   * idempotent across restarts/redeploys — otherwise BullMQ would happily
-   * accumulate a duplicate scheduler every time the process boots.
+   * Schedules TWO recurring broadcast jobs:
+   *   - 8:00 AM daily
+   *   - 6:00 PM daily
+   * Clears any existing repeatable jobs first to avoid duplicates on restart.
    */
   async onModuleInit(): Promise<void> {
-    const cron = this.configService.get('alertBroadcastCron', { infer: true });
-
+    // Clear all existing recurring broadcast jobs
     const existing = await this.alertsQueue.getRepeatableJobs();
     await Promise.all(
       existing
-        .filter((job) => job.id === RECURRING_BROADCAST_JOB_ID)
+        .filter((job) =>
+          job.id === RECURRING_BROADCAST_JOB_ID ||
+          job.id === RECURRING_BROADCAST_JOB_ID_2,
+        )
         .map((job) => this.alertsQueue.removeRepeatableByKey(job.key)),
     );
 
+    // 8:00 AM daily
     await this.alertsQueue.add(
       BROADCAST_JOB,
-      {},
-      { repeat: { pattern: cron }, jobId: RECURRING_BROADCAST_JOB_ID },
+      { slot: 'morning' },
+      { repeat: { pattern: '0 8 * * *' }, jobId: RECURRING_BROADCAST_JOB_ID },
     );
 
-    this.logger.log(`Recurring weather broadcast scheduled with cron "${cron}".`);
+    // 6:00 PM daily
+    await this.alertsQueue.add(
+      BROADCAST_JOB,
+      { slot: 'evening' },
+      { repeat: { pattern: '0 18 * * *' }, jobId: RECURRING_BROADCAST_JOB_ID_2 },
+    );
+
+    this.logger.log('Recurring weather broadcasts scheduled: 8:00 AM and 6:00 PM daily.');
   }
 
   /** Admin "Send Now" button — enqueues an immediate broadcast outside the cron schedule. */
@@ -77,12 +71,6 @@ export class AlertsService implements OnModuleInit {
     return { queued: true };
   }
 
-  /**
-   * Called by AlertsProcessor for the scheduled (and manually-triggered)
-   * broadcast job. Walks every approved + linked user and delivers
-   * independently, so one user's failure (bad chat id, Telegram API hiccup)
-   * never blocks the rest of the batch.
-   */
   async broadcastToApprovedUsers(): Promise<{ sent: number; failed: number }> {
     const recipients = await this.usersService.findApprovedAndLinked();
     let sent = 0;
@@ -98,12 +86,6 @@ export class AlertsService implements OnModuleInit {
     return { sent, failed };
   }
 
-  /**
-   * The admin dashboard's "Send test alert" action for one specific user.
-   * Still enforces APPROVED + telegramLinked — an admin can pick any user
-   * id from the UI, but the underlying guarantee ("only approved users
-   * receive alerts") never bends, even for a manual demo button.
-   */
   async simulateForUser(userId: string): Promise<AlertLogResponseDto> {
     const user = await this.usersService.findById(userId);
 
@@ -147,11 +129,6 @@ export class AlertsService implements OnModuleInit {
     );
   }
 
-  /**
-   * The single choke point for outbound weather messages. Re-checks the
-   * approval gate defensively (defense-in-depth, in case a future caller
-   * forgets to pre-filter) even though both current callers already have.
-   */
   private async deliverAlertToUser(
     user: UserDocument,
     options: { simulated: boolean; triggeredManually: boolean },
@@ -161,10 +138,16 @@ export class AlertsService implements OnModuleInit {
     }
 
     const weather = await this.weatherService.getWeatherForCity(user.city);
+
     const message =
-      `${weather.emoji} *WeatherGuard alert for ${weather.city}*\n\n` +
-      `${weather.condition}, ${weather.temperatureCelsius}°C\n` +
-      `${weather.summary}${weather.simulated ? '\n\n_(simulated forecast — no live weather key configured)_' : ''}`;
+      `${weather.emoji} *WeatherGuard Alert — ${weather.city}*\n\n` +
+      `*Condition:* ${weather.condition}\n` +
+      `*Temperature:* ${weather.temperatureCelsius}°C (feels like ${weather.feelsLikeCelsius}°C)\n` +
+      `*Humidity:* ${weather.humidity}%\n` +
+      `*Wind:* ${weather.windSpeedKph} km/h\n` +
+      `*Visibility:* ${weather.visibilityKm} km\n\n` +
+      `_${weather.summary}_` +
+      `${weather.simulated ? '\n\n_(simulated forecast — no live weather key configured)_' : ''}`;
 
     const delivery = await this.telegramService.sendMessage(user.telegramChatId, message);
 
