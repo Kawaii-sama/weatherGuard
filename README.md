@@ -1,23 +1,33 @@
-# WeatherGuard Admin ☁️☀️
+# WeatherGuard ☁️☀️
 
-An invite-only weather alert service. Users sign in with Google or GitHub,
-request access, and — once an admin approves them from a web dashboard —
-start receiving weather alerts on Telegram.
+An invite-only weather alert service I built from scratch. Users sign in with Google or GitHub, request access, and once an admin approves them, they start getting weather alerts straight to their Telegram — twice a day, every day.
 
 ```
-/api    NestJS backend  (auth, approval workflow, Telegram bot, scheduling)
-/admin  React frontend  (kawaii admin dashboard + user-facing status page)
+/api    NestJS backend  (auth, approval flow, Telegram bot, BullMQ scheduling)
+/admin  React frontend  (kawaii admin dashboard + user status page)
 ```
 
 ---
 
-## 1. System design
+## What it does
 
-### 1.1 Database schema (MongoDB / Mongoose)
+The idea is simple: not everyone should get alerts, only people the admin approves. So the flow is:
 
-Two collections. No separate "access request" table — a user's `status`
-field *is* the request/approval state machine, which keeps "who is allowed
-to receive alerts" answerable with a single query instead of a join.
+1. User signs in with Google or GitHub
+2. They link their Telegram account via a one-time deep link
+3. Admin reviews the request and approves (or rejects) them
+4. Once approved + linked, they get weather alerts at **8:00 AM** and **6:00 PM** every day
+5. Admin can also send a test alert instantly from the dashboard
+
+Each alert includes temperature, feels-like, humidity, wind speed, and visibility — not just "it's cloudy."
+
+---
+
+## System design
+
+### Database (MongoDB)
+
+Two collections — `User` and `AlertLog`. I kept it simple on purpose.
 
 ```
 ┌─────────────────────────────┐        ┌──────────────────────────────┐
@@ -32,169 +42,76 @@ to receive alerts" answerable with a single query instead of a join.
 │ role         user|admin     │        │ status      sent|failed      │
 │ status   pending|approved|  │        │ errorMessage?                │
 │              rejected       │        │ simulated    boolean         │
-│ city         (alert target) │        │ triggeredManually  boolean   │
+│ city                        │        │ triggeredManually  boolean   │
 │ requestNote?                │        │ createdAt                    │
-│ telegramChatId?              │       └──────────────────────────────┘
-│ telegramLinked     boolean  │
-│ telegramLinkToken?           │
+│ telegramChatId?             │        └──────────────────────────────┘
+│ telegramLinked  boolean     │
+│ telegramLinkToken?          │
 │ approvedAt? / approvedBy?   │
 │ rejectedAt? / rejectedBy?   │
 │ createdAt / updatedAt       │
 └─────────────────────────────┘
 ```
 
-**Why a single `User.status` enum instead of a separate requests table:**
-the alert broadcaster's only job is "find everyone who should get a
-message." With one collection that's one filter
-(`status: 'approved', telegramLinked: true`) instead of joining a users
-table against a requests table and reconciling state across two documents.
+No separate "access requests" table — the `status` field on `User` IS the request state machine. When the broadcaster runs, it just queries `{ status: 'approved', telegramLinked: true }` — one query, no joins.
 
-**Why `AlertLog` is its own collection, not an array on `User`:** it's an
-append-only, fast-growing audit trail with a totally different access
-pattern (recent-first feed for the admin dashboard) than the user document.
-Embedding it would make every `User` document grow without bound.
+`AlertLog` is separate because it grows fast and has a completely different access pattern (recent-first feed). Embedding it on the user document would make every user record balloon over time.
 
-**Why `telegramLinkToken` instead of asking for a phone number:** Telegram's
-Bot API never exposes a user's identity until they message the bot. The
-token is a one-time secret embedded in a deep link
-(`t.me/<bot>?start=<token>`); when the bot receives `/start <token>`, it
-resolves the token back to a `User._id` and stores the resulting `chatId`.
-The token is cleared after use, so the link can't be replayed.
+### Why Telegram linking works the way it does
 
-### 1.2 Module architecture (NestJS)
+Telegram's Bot API never tells you who a user is until they message the bot first. So I generate a one-time UUID token per user, embed it in a deep link (`t.me/<bot>?start=<token>`), and when the bot receives `/start <token>`, it resolves back to the right user and stores their `chatId`. Token is cleared after use so the link can't be replayed.
+
+### Backend module structure (NestJS)
 
 ```
 AppModule
-├── AuthModule      Google/GitHub Passport strategies, JWT issuance
-├── UsersModule      User schema + approval workflow (the source of truth)
-├── TelegramModule   Bot lifecycle, account linking, outbound sends
-├── WeatherModule    Live OpenWeather lookup, with a deterministic
-│                    simulated fallback when no API key is configured
-└── AlertsModule     BullMQ-scheduled broadcast + manual "simulate" path,
-                     AlertLog
+├── AuthModule      Google + GitHub OAuth strategies, JWT
+├── UsersModule     User schema, approval workflow
+├── TelegramModule  Bot lifecycle, account linking, message delivery
+├── WeatherModule   OpenWeatherMap integration + simulated fallback
+└── AlertsModule    BullMQ scheduling, broadcast logic, AlertLog
 ```
 
-Each module exposes only a `Service` from its `exports`; controllers and
-schemas stay private to the module that owns them. **`UsersModule` never
-imports `TelegramModule`** — instead, `UsersService.approve()` emits a
-`user.approved` event (`@nestjs/event-emitter`) that `TelegramService`
-listens for. This keeps the dependency graph a tree instead of a cycle: you
-can delete the Telegram integration entirely and the approval workflow
-still compiles and works (alerts just wouldn't be deliverable).
+A few intentional design choices worth noting:
 
-`AlertsService` is the **only** code path that ever calls
-`TelegramService.sendMessage` with a weather message — both the scheduled
-broadcast (via `AlertsProcessor`, a BullMQ worker) and the admin's manual
-"send test alert" button funnel through the same private
-`deliverAlertToUser`, which re-checks `status === 'approved' &&
-telegramLinked` immediately before sending. That single choke point is
-what the next section is really about.
+- `UsersModule` never imports `TelegramModule`. Instead, `UsersService.approve()` emits a `user.approved` event that `TelegramService` listens for. This keeps the dependency graph clean — you could rip out the entire Telegram integration and the approval flow still works.
 
-### 1.3 Data flow — how only "Approved" users receive alerts
+- `AlertsService.deliverAlertToUser()` is the **only** place that calls `TelegramService.sendMessage()` with a weather message. Both the scheduled broadcast and the manual test button funnel through it. It re-checks `status === approved && telegramLinked` every time before sending — defense in depth.
 
-There are **two independent gates**, both enforced at send time, not just
-at request time:
+### Why BullMQ instead of node-cron
 
-1. **`status === 'approved'`** — set exactly once, by `UsersService.approve()`,
-   which only an authenticated admin (`@Roles(UserRole.ADMIN)` +
-   `RolesGuard`) can call.
-2. **`telegramLinked === true`** — set exactly once, by
-   `UsersService.linkTelegramAccount()`, which only runs after a user
-   completes the one-time `/start <token>` deep link in Telegram.
-
-```
- sign in (Google/GitHub)
-        │
-        ▼
- User created, status=PENDING ──────────────► dashboard shows "Pending"
-        │                                       (UsersController list)
-        │ admin clicks "Approve"
-        ▼
- status=APPROVED, user.approved event fires
-        │                                       ┌─────────────────────┐
-        │                                       │ if telegramLinked,  │
-        ├──────────────────────────────────────►│ TelegramService     │
-        │                                       │ sends "you're in!"  │
-        │                                       └─────────────────────┘
-        ▼
- user opens t.me/<bot>?start=<token> in Telegram
-        │
-        ▼
- telegramLinked=true, chatId stored, token cleared (single-use)
-        │
-        ▼
- user now satisfies BOTH gates
-        │
-        ▼
- AlertsService.findApprovedAndLinked() includes them
-        │
-        ▼
- BullMQ repeatable job (cron from ALERT_BROADCAST_CRON) fires
-        │
-        ▼
- deliverAlertToUser() re-checks both gates → sends → writes AlertLog
-```
-
-A user who is `approved` but never links Telegram never receives anything
-(there's no `chatId` to send to). A user who links Telegram while still
-`pending` is stored as linked, but `findApprovedAndLinked()` still excludes
-them — linking early doesn't grant early access. The query that decides
-"who gets a message" and the function that's allowed to send a message are
-the same two checks, repeated in exactly one place
-(`AlertsService.deliverAlertToUser`), which is what makes the guarantee
-auditable instead of "trust every caller to remember."
-
-### 1.4 Why BullMQ over plain `node-cron`
-
-The recurring broadcast is a BullMQ **repeatable job**
-(`ALERT_BROADCAST_CRON`, default hourly) rather than a bare `node-cron`
-timer, because:
-
-- It survives a restart/redeploy without double-scheduling — `AlertsService`
-  clears any existing repeatable job with the same id on boot before
-  re-adding it.
-- The admin's "Send broadcast now" button reuses the exact same queue and
-  worker, instead of needing a second, parallel code path.
-- Individual deliveries are processed one user at a time inside the worker,
-  so one user's Telegram error doesn't take down the batch — every send is
-  wrapped and logged independently.
+BullMQ repeatable jobs survive restarts without double-scheduling (I clear the existing job by ID on boot before re-adding it). The admin "Send Now" button reuses the exact same queue and worker — no second code path to maintain. And if one user's delivery fails, it doesn't affect anyone else in the batch.
 
 ---
 
-## 2. Setup instructions
+## Getting started
 
-### 2.1 Prerequisites
+### What you'll need
 
 - Node.js 20+
-- A MongoDB instance (local, or a free MongoDB Atlas cluster)
-- A Redis instance (local, or a free Upstash/Redis Cloud instance — required
-  by BullMQ)
-- A Telegram bot token (message **@BotFather** on Telegram → `/newbot`)
-- Google OAuth credentials ([console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials)
-- GitHub OAuth credentials ([github.com/settings/developers](https://github.com/settings/developers) → OAuth Apps)
+- MongoDB (local or [Atlas free tier](https://www.mongodb.com/atlas))
+- Redis (local or [Upstash free tier](https://upstash.com))
+- A Telegram bot token — message [@BotFather](https://t.me/botfather) → `/newbot`
+- Google OAuth credentials — [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials
+- GitHub OAuth credentials — [github.com/settings/developers](https://github.com/settings/developers) → OAuth Apps
 
-OpenWeatherMap API key is **optional** — without one, `WeatherService` falls
-back to a deterministic simulated forecast, so the entire pipeline (auth →
-approval → Telegram → scheduled alert) is fully demoable with zero paid
-keys.
+> OpenWeatherMap API key is **optional**. Without one, the weather service falls back to a deterministic simulated forecast so the whole pipeline is fully demoable with zero paid APIs.
 
-### 2.2 Backend (`/api`)
+### Backend
 
 ```bash
 cd api
 cp .env.example .env
-# fill in MONGODB_URI, REDIS_URL, JWT_SECRET, ADMIN_EMAILS, OAuth + Telegram credentials
+# fill in MONGODB_URI, REDIS_URL, JWT_SECRET, ADMIN_EMAILS, OAuth + Telegram creds
 npm install
 npm run start:dev
 ```
 
-`ADMIN_EMAILS` is how the first administrator account is seeded — list your
-own email there, and your first sign-in auto-approves you as `admin`, with
-no manual database edits required.
+Set your own email in `ADMIN_EMAILS` and your first login auto-promotes you to admin — no database tinkering needed.
 
-The API serves interactive Swagger docs at `http://localhost:3000/docs`.
+Swagger docs available at `http://localhost:3000/docs`.
 
-### 2.3 Frontend (`/admin`)
+### Frontend
 
 ```bash
 cd admin
@@ -206,58 +123,39 @@ npm run dev
 
 Visit `http://localhost:5173`.
 
-### 2.4 Demoing the full flow locally
-
-1. Sign in with Google or GitHub at `/login`. If your email is in
-   `ADMIN_EMAILS`, you land on `/dashboard` as an admin; otherwise you land
-   on the pending-status page.
-2. As a non-admin user, set a city and open the Telegram deep link shown on
-   your status page; tap **Start** in Telegram.
-3. As the admin, go to **Requests**, find the pending user, and click
-   **Approve**. They immediately get an "approved!" message on Telegram
-   (if already linked).
-4. Go to **Alerts** → **Send a test alert**, pick that user, and send — this
-   is the "simulated weather alert" deliverable, delivered instantly without
-   waiting for the hourly broadcast.
-5. **Send broadcast now** exercises the same path BullMQ runs automatically
-   every `ALERT_BROADCAST_CRON`.
-
-### 2.5 Quickest local start: Docker Compose
+### Quickest start — Docker Compose
 
 ```bash
 cp api/.env.example api/.env   # fill in your credentials
 docker compose up --build
 ```
 
-Spins up Mongo, Redis, the API, and the admin frontend together —
-`api/Dockerfile`, `admin/Dockerfile`, and `docker-compose.yml` are already
-in the repo.
+Spins up MongoDB, Redis, the API, and the frontend all at once.
 
-### 2.6 Deploying
+### Testing the full flow locally
 
-- **API**: Render, Railway, or Fly.io all work well for a long-running
-  Node process (the Telegram bot uses long polling, so it needs a
-  persistently-running server rather than serverless functions). A
-  `render.yaml` blueprint is included — Render reads it automatically and
-  provisions the API + a managed Redis instance in one step.
-- **Admin**: Vercel or Netlify for the static Vite build. `admin/vercel.json`
-  is included for client-side routing support.
-- Remember to set `FRONTEND_URL` on the API (for CORS + the OAuth redirect
-  target) and `VITE_API_URL` on the frontend to your deployed API URL, and
-  add your deployed callback URLs to the Google/GitHub OAuth app
-  configuration.
-- **Exact copy-paste commands for all of the above** (git push, Render,
-  Vercel) are in `DEPLOYMENT.md`.
+1. Go to `/login` and sign in with Google or GitHub. If your email is in `ADMIN_EMAILS` you'll land on the admin dashboard. Otherwise you'll land on the pending page.
+2. As a non-admin user, set your city and connect Telegram — you can do it from desktop (opens the bot directly) or mobile (copy the link and send it to yourself).
+3. As admin, go to **Requests → Pending**, find the user, and click **Approve**. If they're already Telegram-linked, they'll get a notification instantly.
+4. Go to **Alerts → Send test alert**, pick the user, and fire it off. They'll get a full weather alert with temperature, humidity, wind, and more.
+5. **Send broadcast now** manually triggers the same job that runs automatically at 8 AM and 6 PM.
 
 ---
 
-## 3. Notes on scope
+## Deploying
 
-This was built end-to-end as source — auth, approval workflow, Telegram
-bot, BullMQ scheduling, weather simulation/live lookup, and the full kawaii
-admin UI — but wasn't run against a live MongoDB/Redis/Telegram/OAuth stack
-in this environment (no outbound network access here), so there's no
-substitute for a real `npm install` + first boot to catch anything an
-offline read-through can't. Every `.ts`/`.tsx` file passed a standalone
-TypeScript syntax check; what hasn't been verified is runtime behavior
-against actual external services.
+### API → Render
+The repo includes a `render.yaml` blueprint. Push to GitHub, connect to Render, and it provisions the API + a managed Redis instance automatically. Uses long polling for the Telegram bot so it needs a persistent server, not serverless.
+
+### Frontend → Vercel
+`admin/vercel.json` is already included for client-side routing. Connect your repo to Vercel and it deploys on every push.
+
+### Database → MongoDB Atlas
+Free 512MB cluster. Create one at [mongodb.com/atlas](https://www.mongodb.com/atlas), grab the connection string, and drop it in `MONGODB_URI`.
+
+After deploying, remember to:
+- Set `FRONTEND_URL` on the API to your Vercel URL (for CORS + OAuth redirects)
+- Set `VITE_API_URL` on the frontend to your Render URL
+- Update the Google/GitHub OAuth callback URLs to your deployed domains
+
+Step-by-step deployment commands are in [`DEPLOYMENT.md`](./DEPLOYMENT.md).
