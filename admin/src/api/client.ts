@@ -68,6 +68,7 @@ export const api = {
   approveUser: (id: string) => request<AppUser>(`/users/${id}/approve`, { method: 'PATCH' }),
 
   rejectUser: (id: string) => request<AppUser>(`/users/${id}/reject`, { method: 'PATCH' }),
+  deleteUser: (id: string) => request<void>(`/users/${id}`, { method: 'DELETE' }),
 
   listAlertLogs: (limit = 50) => request<AlertLogEntry[]>(`/alerts/logs?limit=${limit}`),
 
