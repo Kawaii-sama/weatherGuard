@@ -87,7 +87,7 @@ export function PendingApprovalPage() {
               </p>
             ) : (
               <>
-                <TelegramConnect deepLink={user.telegramDeepLink} />
+                <TelegramConnect deepLink={user.telegramDeepLink ?? ''} />
               </>
             )}
           </div>
