@@ -4,6 +4,7 @@ import { KawaiiSunMascot } from '../components/KawaiiSunMascot';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiRequestError } from '../api/client';
+import { TelegramConnect } from '../components/TelegramConnect';
 
 export function PendingApprovalPage() {
   const { user, refresh } = useAuth();
@@ -79,18 +80,7 @@ export function PendingApprovalPage() {
               </p>
             ) : (
               <>
-                <p className="text-ink-soft font-body text-sm mb-4">
-                  Open this link in Telegram and tap Start — it's how we know where to send your
-                  alerts.
-                </p>
-                <a
-                  href={user.telegramDeepLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="kawaii-btn-primary w-full"
-                >
-                  Open Telegram bot
-                </a>
+                <TelegramConnect deepLink={user.telegramDeepLink} />
               </>
             )}
           </div>
