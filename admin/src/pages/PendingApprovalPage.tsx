@@ -38,6 +38,13 @@ export function PendingApprovalPage() {
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-sky via-[#DFF4FF] to-cloud px-6 py-12">
       <KawaiiCloud className="absolute top-8 right-[-6%] w-64 animate-drift opacity-80" />
       <KawaiiCloud className="absolute bottom-10 left-[-6%] w-56 animate-drift-slow opacity-70" tone="sky" />
+      {/* pastel decorations */}
+      <span className="absolute" style={{ top: '12%', left: '4%', fontSize: '2rem', opacity: 0.18 }}>🌿</span>
+      <span className="absolute" style={{ top: '30%', right: '3%', fontSize: '1.6rem', opacity: 0.15 }}>🌸</span>
+      <span className="absolute" style={{ top: '55%', left: '2%', fontSize: '1.8rem', opacity: 0.15 }}>🍃</span>
+      <span className="absolute" style={{ top: '70%', right: '5%', fontSize: '1.5rem', opacity: 0.13 }}>🌱</span>
+      <span className="absolute" style={{ bottom: '15%', left: '6%', fontSize: '1.6rem', opacity: 0.12 }}>🌷</span>
+      <span className="absolute" style={{ bottom: '8%', right: '8%', fontSize: '1.4rem', opacity: 0.13 }}>🌾</span>
 
       <div className="relative max-w-lg mx-auto">
         <div className="kawaii-card px-8 py-10 text-center mb-6">
