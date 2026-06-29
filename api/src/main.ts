@@ -5,6 +5,16 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AppConfig } from './config/configuration';
 
+// TEMPORARY DIAGNOSTIC — catches anything that slips past Nest's own
+// exception filter entirely and prints the real error instead of the
+// request just silently dying with no log output at all.
+process.on('uncaughtException', (err) => {
+  console.error('🔴 UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('🔴 UNHANDLED REJECTION:', reason);
+});
+
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
