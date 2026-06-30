@@ -12,21 +12,31 @@ const TABS: { key: UserStatus; label: string }[] = [
 ];
 
 export function DashboardPage() {
+  // Current selected tab of user states: pending/approved/rejected.
   const [tab, setTab] = useState<UserStatus>('pending');
+  // The list of users shown for the current tab.
   const [users, setUsers] = useState<AppUser[] | null>(null);
+  // Count of pending approvals used in the tab badge and nav.
   const [pendingCount, setPendingCount] = useState(0);
+  // Display API errors to the admin.
   const [error, setError] = useState<string | null>(null);
+  // Track the user currently being approved/rejected/deleted.
   const [actingOn, setActingOn] = useState<string | null>(null);
+  // User selected for the delete confirmation modal.
   const [confirmDelete, setConfirmDelete] = useState<AppUser | null>(null);
 
   const load = useCallback(async (status: UserStatus) => {
+    // Clear previous state while new data is loading.
     setError(null);
     setUsers(null);
+
     try {
       const [list, allPending] = await Promise.all([
         api.listUsers(status),
+        // Only fetch the pending list separately when not already viewing pending.
         status === 'pending' ? Promise.resolve(undefined) : api.listUsers('pending'),
       ]);
+
       setUsers(list);
       if (allPending) setPendingCount(allPending.length);
       else if (status === 'pending') setPendingCount(list.length);
@@ -35,7 +45,10 @@ export function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => { load(tab); }, [tab, load]);
+  useEffect(() => {
+    // Reload the current tab whenever the selected tab changes.
+    load(tab);
+  }, [tab, load]);
 
   const handleApprove = async (id: string) => {
     setActingOn(id);
@@ -63,8 +76,11 @@ export function DashboardPage() {
 
   const handleDeleteConfirmed = async () => {
     if (!confirmDelete) return;
+
+    // Keep the delete target visible while the request is in flight.
     setActingOn(confirmDelete.id);
     setConfirmDelete(null);
+
     try {
       await api.deleteUser(confirmDelete.id);
       await load(tab);
