@@ -7,13 +7,16 @@ import { api, ApiRequestError } from '../api/client';
 import { TelegramConnect } from '../components/TelegramConnect';
 
 export function PendingApprovalPage() {
+  // Read the authenticated user and refresh helper from auth context.
   const { user, refresh } = useAuth();
+  // Editable form fields are pre-filled from the current user profile.
   const [city, setCity] = useState(user?.city ?? '');
   const [note, setNote] = useState(user?.requestNote ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  // Don't render until the auth context has loaded a user.
   if (!user) return null;
 
   const handleSave = async (e: React.FormEvent) => {
@@ -21,6 +24,7 @@ export function PendingApprovalPage() {
     setSaving(true);
     setError(null);
     setSaved(false);
+
     try {
       await api.updateMe({ city, requestNote: note });
       await refresh();
@@ -76,6 +80,7 @@ export function PendingApprovalPage() {
           )}
         </div>
 
+        {/* Telegram linking section is hidden for rejected users. */}
         {user.status !== 'rejected' && (
           <div className="kawaii-card px-8 py-8 mb-6">
             <h2 className="font-display font-bold text-lg mb-1">
@@ -93,6 +98,7 @@ export function PendingApprovalPage() {
           </div>
         )}
 
+        {/* Preferences form for pending and approved users. */}
         {user.status !== 'rejected' && (
           <form onSubmit={handleSave} className="kawaii-card px-8 py-8">
             <h2 className="font-display font-bold text-lg mb-4">Alert preferences</h2>
