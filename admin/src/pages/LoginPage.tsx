@@ -5,6 +5,7 @@ import { api } from '../api/client';
 export function LoginPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-sky via-[#DFF4FF] to-cloud flex items-center justify-center px-6">
+      {/* Decorative floating clouds in the login background. */}
       <KawaiiCloud className="absolute top-10 left-[-5%] w-56 animate-drift-slow opacity-90" />
       <KawaiiCloud className="absolute top-32 right-[-8%] w-72 animate-drift opacity-80" tone="sky" />
       <KawaiiCloud className="absolute bottom-16 left-[10%] w-44 animate-drift opacity-70" />
@@ -20,6 +21,7 @@ export function LoginPage() {
         </p>
 
         <div className="flex flex-col gap-3">
+          {/* Start OAuth flows by redirecting to the backend login endpoints. */}
           <a href={api.googleLoginUrl()} className="kawaii-btn-primary w-full">
             Continue with Google
           </a>
