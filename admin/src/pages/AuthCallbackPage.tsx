@@ -11,12 +11,17 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
  * to the router — it never re-reads the URL after this first render.
  */
 export function AuthCallbackPage() {
+  // React Router helper for reading the query string.
   const [searchParams] = useSearchParams();
+  // Router navigation helper used after onboarding the auth token.
   const navigate = useNavigate();
+  // Auth context helper to refresh the authenticated user state.
   const { refresh } = useAuth();
+  // Local error message shown if the callback URL is missing a token.
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Expect `?token=...` from the auth provider redirect.
     const token = searchParams.get('token');
 
     if (!token) {
@@ -24,6 +29,7 @@ export function AuthCallbackPage() {
       return;
     }
 
+    // Persist the token and update auth state, then send the user home.
     setToken(token);
     refresh().then(() => navigate('/', { replace: true }));
   }, [searchParams, navigate, refresh]);
