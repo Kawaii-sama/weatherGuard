@@ -6,13 +6,20 @@ import { api, ApiRequestError } from '../api/client';
 import type { AlertLogEntry, AppUser } from '../types';
 
 export function AlertsLogPage() {
+  // State for the alert log rows shown in the table.
   const [logs, setLogs] = useState<AlertLogEntry[] | null>(null);
+  // Approved users are used for manual test alert selection.
   const [approvedUsers, setApprovedUsers] = useState<AppUser[]>([]);
+  // Show count of pending approvals in the admin nav.
   const [pendingCount, setPendingCount] = useState(0);
+  // Track the currently selected user for sending a test alert.
   const [selectedUserId, setSelectedUserId] = useState('');
+  // Busy state disables buttons while requests are in flight.
   const [busy, setBusy] = useState(false);
+  // Inline flash message shown after broadcast or test actions.
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
+  // Load the most recent alert logs from the API.
   const loadLogs = useCallback(async () => {
     try {
       setLogs(await api.listAlertLogs(50));
@@ -25,11 +32,13 @@ export function AlertsLogPage() {
   }, []);
 
   useEffect(() => {
+    // Fetch initial data once when the component mounts.
     loadLogs();
     api.listUsers('approved').then(setApprovedUsers).catch(() => undefined);
     api.listUsers('pending').then((u) => setPendingCount(u.length)).catch(() => undefined);
   }, [loadLogs]);
 
+  // Only show users who have linked Telegram for the test alert dropdown.
   const linkedApprovedUsers = approvedUsers.filter((u) => u.telegramLinked);
 
   const handleBroadcast = async () => {
@@ -38,6 +47,7 @@ export function AlertsLogPage() {
     try {
       await api.triggerBroadcast();
       setMessage({ kind: 'success', text: 'Broadcast queued — check back here in a few seconds.' });
+      // Refresh logs after a short delay so the UI can reflect the broadcast.
       setTimeout(loadLogs, 3000);
     } catch (err) {
       setMessage({
@@ -51,8 +61,10 @@ export function AlertsLogPage() {
 
   const handleSimulate = async () => {
     if (!selectedUserId) return;
+
     setBusy(true);
     setMessage(null);
+
     try {
       const result = await api.simulateAlert(selectedUserId);
       setMessage({
